@@ -252,6 +252,9 @@ class FlagOptions(StructWithDefaults):
 
     M_MIN_in_Mass : bool, optional
         Whether the minimum mass is defined by Mass or Virial Temperature
+
+    PHOTON_CONS : bool, optional
+        Whether to perform a small correction to account for photon non-conservation
     """
 
     _ffi = ffi
@@ -262,6 +265,7 @@ class FlagOptions(StructWithDefaults):
         INHOMO_RECO=False,
         USE_TS_FLUCT=False,
         M_MIN_in_Mass=False,
+        PHOTON_CONS=False,
     )
 
     @property
@@ -748,6 +752,25 @@ def compute_luminosity_function(*, redshifts, user_params=None, cosmo_params=Non
     lfunc[lfunc <= -30] = np.nan
 
     return Muvfunc, Mhfunc, lfunc
+
+
+def Initialise_PhotonConservationCorrection(*, user_params=None, cosmo_params=None, astro_params=None, flag_options=None,
+                                            redshifts_estimate, nf_estimate):
+    user_params = UserParams(user_params)
+    cosmo_params = CosmoParams(cosmo_params)
+    astro_params = AstroParams(astro_params)
+    flag_options = FlagOptions(flag_options)
+
+    # Convert the data to the right type
+    redshifts_estimate = np.array(redshifts_estimate, dtype='float32')
+    nf_estimate = np.array(nf_estimate, dtype='float32')
+
+    z = ffi.cast("float *", ffi.from_buffer(redshifts_estimate))
+    xHI = ffi.cast("float *", ffi.from_buffer(nf_estimate))
+
+    return lib.InitialisePhotonCons(
+        user_params(), cosmo_params(), astro_params(), flag_options(), z, xHI
+    )
 
 
 def initial_conditions(*, user_params=None, cosmo_params=None, random_seed=None, regenerate=False, write=True,
