@@ -32,6 +32,8 @@ struct GlobalParams{
     float MIN_DENSITY_LOW_LIMIT;
     
     int RecombPhotonCons;
+    float PhotonConsStart;
+    float PhotonConsEnd;
     
     int HEAT_FILTER;
     double CLUMPING_FACTOR;
@@ -94,6 +96,8 @@ struct GlobalParams global_params = {
     .MIN_DENSITY_LOW_LIMIT = 9e-8,
     
     .RecombPhotonCons = 0,
+    .PhotonConsStart = 0.995,
+    .PhotonConsEnd = 0.30,
     
     .HEAT_FILTER = 0,
     .CLUMPING_FACTOR = 2.,

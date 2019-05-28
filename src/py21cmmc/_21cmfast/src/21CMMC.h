@@ -116,7 +116,7 @@ int ComputeBrightnessTemp(float redshift, int saturated_limit, struct UserParams
 
 int InitialisePhotonCons(struct UserParams *user_params, struct CosmoParams *cosmo_params,
                          struct AstroParams *astro_params, struct FlagOptions *flag_options,
-                         float *z_estimate, float *xH_estimate);
+                         double *z_estimate, double *xH_estimate, int NSpline);
 
 int ComputeLF(int nbins, struct UserParams *user_params, struct CosmoParams *cosmo_params, struct AstroParams *astro_params,
                struct FlagOptions *flag_options, int NUM_OF_REDSHIFT_FOR_LF, float *z_LF, double *M_uv_z, double *M_h_z, double *log10phi);

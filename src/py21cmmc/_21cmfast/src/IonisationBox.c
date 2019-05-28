@@ -5,6 +5,8 @@ int INIT_RECOMBINATIONS = 1;
 
 double *ERFC_VALS, *ERFC_VALS_DIFF;
 
+float prev_adjusted_redshift, absolute_delta_z;
+
 int ComputeIonizedBox(float redshift, float prev_redshift, struct UserParams *user_params, struct CosmoParams *cosmo_params,
                        struct AstroParams *astro_params, struct FlagOptions *flag_options,
                        struct PerturbedField *perturbed_field, struct IonizedBox *previous_ionize_box,
@@ -62,6 +64,16 @@ LOG_DEBUG("redshift=%f, prev_redshift=%f", redshift, prev_redshift);
     
     float min_density, max_density;
     
+    
+    float adjustment_factor, adjustment_factor_original, adjusted_redshift, required_NF, stored_redshift, closest_redshift;
+    double temp;
+    
+    double mean_f_coll_st_photoncons, f_coll_photoncons, ST_over_PS_photoncons;
+    float redshift_table_fcollz_photoncons, min_density_photoncons, max_density_photoncons;
+    int redshift_int_fcollz_photoncons;
+    float curr_dens_photoncons;
+    
+    
     const gsl_rng_type * T;
     gsl_rng * r;
     
@@ -97,6 +109,48 @@ LOG_SUPER_DEBUG("defined parameters");
     fabs_dtdz = fabs(dtdz(redshift));
     t_ast = astro_params->t_STAR * t_hubble(redshift);
     growth_factor_dz = dicke(redshift-dz);
+    
+    if(flag_options->PHOTON_CONS) {
+        
+        Q_at_z(redshift, &(temp));
+        required_NF = 1.0 - (float)temp;
+        
+        if(required_NF > global_params.PhotonConsStart) {
+            adjusted_redshift = redshift;
+        }
+        else if(required_NF<=global_params.PhotonConsEnd) {
+            
+            if(FirstNF_Estimate <= 0. && required_NF <= 0.0) {
+                // Reionisation has already happened well before the calibration
+                adjusted_redshift = redshift;
+            }
+            else {
+                adjusted_redshift = redshift - absolute_delta_z;
+            }
+        }
+        else {
+            if(required_NF < FinalNF_Estimate) {
+                // This model is completely unreasonble (reionisation will never happen!)
+                // So I don't really think it matters what I select for this
+                adjusted_redshift = redshift;
+            }
+            else {
+                z_at_NFHist(required_NF,&(temp));
+                adjusted_redshift = (float)temp;
+                
+                absolute_delta_z = fabs( adjusted_redshift - redshift );
+            }
+        }
+        
+//        printf("z = %e Required NF = %e Adjusted redshift = %e delta_z = %e\n",redshift,required_NF,adjusted_redshift,absolute_delta_z);
+        
+        stored_redshift = redshift;
+        
+        redshift = adjusted_redshift;
+        
+        prev_adjusted_redshift = adjusted_redshift;
+    }
+    
     
     Splined_Fcoll = 0.;
     
@@ -169,10 +223,22 @@ LOG_SUPER_DEBUG("erfc interpolation done");
      
     // Calculate the density field for this redshift if the initial conditions/cosmology are changing
     
-    for (i=0; i<user_params->HII_DIM; i++){
-        for (j=0; j<user_params->HII_DIM; j++){
-            for (k=0; k<user_params->HII_DIM; k++){
-                *((float *)deltax_unfiltered + HII_R_FFT_INDEX(i,j,k)) = perturbed_field->density[HII_R_INDEX(i,j,k)];
+    if(flag_options->PHOTON_CONS) {
+    
+        for (i=0; i<user_params->HII_DIM; i++){
+            for (j=0; j<user_params->HII_DIM; j++){
+                for (k=0; k<user_params->HII_DIM; k++){
+                    *((float *)deltax_unfiltered + HII_R_FFT_INDEX(i,j,k)) = (perturbed_field->density[HII_R_INDEX(i,j,k)])*dicke(redshift)/dicke(stored_redshift);
+                }
+            }
+        }
+    }
+    else {
+        for (i=0; i<user_params->HII_DIM; i++){
+            for (j=0; j<user_params->HII_DIM; j++){
+                for (k=0; k<user_params->HII_DIM; k++){
+                    *((float *)deltax_unfiltered + HII_R_FFT_INDEX(i,j,k)) = perturbed_field->density[HII_R_INDEX(i,j,k)];
+                }
             }
         }
     }
@@ -238,13 +304,14 @@ LOG_SUPER_DEBUG("sigma table has been initialised");
         mean_f_coll = FgtrM_General(redshift, M_MIN);
     }
     
+    
     if(isfinite(mean_f_coll)==0) {
         LOG_ERROR("Mean collapse fraction is either finite or NaN!");
         return(2);
     }
 
 LOG_SUPER_DEBUG("excursion set normalisation, mean_f_coll: %f", mean_f_coll);
-    printf("mean_f_coll_st = %e ION_EFF_FACTOR = %e\n",mean_f_coll,ION_EFF_FACTOR);
+//    printf("mean_f_coll_st = %e ION_EFF_FACTOR = %e\n",mean_f_coll,ION_EFF_FACTOR);
     if (mean_f_coll * ION_EFF_FACTOR < global_params.HII_ROUND_ERR){ // way too small to ionize anything...
     //        printf( "The mean collapse fraction is %e, which is much smaller than the effective critical collapse fraction of %e\n I will just declare everything to be neutral\n", mean_f_coll, f_coll_crit);
         
@@ -659,7 +726,7 @@ LOG_ULTRA_DEBUG("while loop for until RtoM(R)=%f reaches M_MIN=%f", RtoM(R), M_M
             }
             
             ST_over_PS = mean_f_coll/f_coll;
-            
+
             //////////////////////////////  MAIN LOOP THROUGH THE BOX ///////////////////////////////////
             // now lets scroll through the filtered box
             

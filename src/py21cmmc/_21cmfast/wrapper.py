@@ -755,21 +755,21 @@ def compute_luminosity_function(*, redshifts, user_params=None, cosmo_params=Non
 
 
 def Initialise_PhotonConservationCorrection(*, user_params=None, cosmo_params=None, astro_params=None, flag_options=None,
-                                            redshifts_estimate, nf_estimate):
+                                            redshifts_estimate, nf_estimate, NSpline):
     user_params = UserParams(user_params)
     cosmo_params = CosmoParams(cosmo_params)
     astro_params = AstroParams(astro_params)
     flag_options = FlagOptions(flag_options)
 
     # Convert the data to the right type
-    redshifts_estimate = np.array(redshifts_estimate, dtype='float32')
-    nf_estimate = np.array(nf_estimate, dtype='float32')
+    redshifts_estimate = np.array(redshifts_estimate, dtype='float64')
+    nf_estimate = np.array(nf_estimate, dtype='float64')
 
-    z = ffi.cast("float *", ffi.from_buffer(redshifts_estimate))
-    xHI = ffi.cast("float *", ffi.from_buffer(nf_estimate))
+    z = ffi.cast("double *", ffi.from_buffer(redshifts_estimate))
+    xHI = ffi.cast("double *", ffi.from_buffer(nf_estimate))
 
     return lib.InitialisePhotonCons(
-        user_params(), cosmo_params(), astro_params(), flag_options(), z, xHI
+        user_params(), cosmo_params(), astro_params(), flag_options(), z, xHI, NSpline
     )
 
 
