@@ -100,6 +100,9 @@ static gsl_spline *NFHistory_spline;
 void initialise_NFHistory_spline(double *redshifts, double *NF_estimate, int NSpline);
 void z_at_NFHist(double xHI_Hist, double *splined_value);
 
+//int nbin;
+//double *z_Q, *Q_value, *Q_z, *z_value;
+
 double FinalNF_Estimate, FirstNF_Estimate;
 
 struct parameters_gsl_FgtrM_int_{
@@ -1845,7 +1848,7 @@ int InitialisePhotonCons(struct UserParams *user_params, struct CosmoParams *cos
     double reduce_ratio = 1.003;
     double Q0,Q1,Nion0,Nion1,Trec,da,a,z0,z1,zi,dadt,ans;
     double *z_arr,*Q_arr;
-    int Nmax = 600; // This is the number of step, enough with 'da = 2e-3'. If 'da' is reduced, this number should be checked.
+    int Nmax = 2000; // This is the number of step, enough with 'da = 2e-3'. If 'da' is reduced, this number should be checked.
     int cnt, nbin, i, istart;
     
     z_arr = calloc(Nmax,sizeof(double));
@@ -1866,8 +1869,7 @@ int InitialisePhotonCons(struct UserParams *user_params, struct CosmoParams *cos
     }
     
     a = a_start;
-    da = 8e-3;
-//    da = 1e-2;
+    da = 2e-3;
     
     cnt = 0;
     Q0 = 0.;
@@ -1885,13 +1887,6 @@ int InitialisePhotonCons(struct UserParams *user_params, struct CosmoParams *cos
             Nion1 = ION_EFF_FACTOR*Nion_General(z1, astro_params->M_TURN, astro_params->ALPHA_STAR,
                                                 astro_params->ALPHA_ESC, astro_params->F_STAR10, astro_params->F_ESC10,
                                                 Mlim_Fstar, Mlim_Fesc);
-//            printf("zi = %e z0 = %e z1 = %e ION_EFF_FACTOR = %e Nion_General(z0) = %e Nion_General(z1) = %e\n",zi,z0,z1,ION_EFF_FACTOR,
-//                   Nion_General(z0, astro_params->M_TURN, astro_params->ALPHA_STAR,astro_params->ALPHA_ESC,
-//                                astro_params->F_STAR10, astro_params->F_ESC10,Mlim_Fstar, Mlim_Fesc),
-//                   Nion_General(z1, astro_params->M_TURN, astro_params->ALPHA_STAR,
-//                                astro_params->ALPHA_ESC, astro_params->F_STAR10, astro_params->F_ESC10,
-//                                Mlim_Fstar, Mlim_Fesc)
-//                   );
         }
         else {
             
@@ -1945,24 +1940,25 @@ int InitialisePhotonCons(struct UserParams *user_params, struct CosmoParams *cos
     nbin = cnt - istart;
     
     // initialise interploation Q as a function of z
-    double z_Q[nbin],Q_value[nbin];
+    double *z_Q = calloc(nbin,sizeof(double));
+    double *Q_value = calloc(nbin,sizeof(double));
     
     Q_at_z_spline_acc = gsl_interp_accel_alloc ();
     Q_at_z_spline = gsl_spline_alloc (gsl_interp_linear, nbin);
     for (i=0; i<nbin; i++){
         z_Q[i] = z_arr[cnt-i];
         Q_value[i] = Q_arr[cnt-i];
-//        printf("z_Q = %e Q_value = %e\n",z_Q[i],Q_value[i]);
     }
-    gsl_spline_init(Q_at_z_spline, z_Q, Q_value, nbin);
     
+    gsl_spline_init(Q_at_z_spline, z_Q, Q_value, nbin);
     Zmin = z_Q[0];
     Zmax = z_Q[nbin-1];
     Qmin = Q_value[nbin-1];
     Qmax = Q_value[0];
     
     // initialise interploation z as a function of Q
-    double Q_z[nbin],z_value[nbin];
+    double *Q_z = calloc(nbin,sizeof(double));
+    double *z_value = calloc(nbin,sizeof(double));
     
     z_at_Q_spline_acc = gsl_interp_accel_alloc ();
     z_at_Q_spline = gsl_spline_alloc (gsl_interp_linear, nbin);
@@ -1970,11 +1966,11 @@ int InitialisePhotonCons(struct UserParams *user_params, struct CosmoParams *cos
         Q_z[i] = Q_value[nbin-1-i];
         z_value[i] = z_Q[nbin-1-i];
     }
-    free(z_arr);
-    free(Q_arr);
-    
+
     gsl_spline_init(z_at_Q_spline, Q_z, z_value, nbin);
     
+    free(z_arr);
+    free(Q_arr);
     return(0);
 }
 
@@ -2040,13 +2036,13 @@ void initialise_NFHistory_spline(double *redshifts, double *NF_estimate, int NSp
     for(i=0;i<counter;i++) {
         nf_vals[i] = NF_estimate[start_index+i];
         z_vals[i] = redshifts[start_index+i];
-//        printf("z_vals = %e nf_vals = %e\n",z_vals[i],nf_vals[i]);
     }
     
     NFHistory_spline_acc = gsl_interp_accel_alloc ();
     NFHistory_spline = gsl_spline_alloc (gsl_interp_linear, counter);
-    
+
     gsl_spline_init(NFHistory_spline, nf_vals, z_vals, counter);
+
 }
 
 

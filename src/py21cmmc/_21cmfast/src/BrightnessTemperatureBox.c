@@ -51,7 +51,7 @@ int ComputeBrightnessTemp(float redshift, int saturated_limit, struct UserParams
     sqrt( (0.15/(cosmo_params->OMm)/(cosmo_params->hlittle)/(cosmo_params->hlittle)) * (1.+redshift)/10.0 );
     
     ///////////////////////////////  END INITIALIZATION /////////////////////////////////////////////
-    
+        
     // ok, lets fill the delta_T box; which will be the same size as the bubble box
     
     for (i=0; i<user_params->HII_DIM; i++){
@@ -473,7 +473,6 @@ int ComputeBrightnessTemp(float redshift, int saturated_limit, struct UserParams
         LOG_ERROR("Average brightness temperature (after including velocities) is infinite or NaN!");
         return(2);
     }
-
 
 LOG_DEBUG("ave Tb = %e", ave);
 

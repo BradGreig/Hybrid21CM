@@ -140,10 +140,7 @@ LOG_SUPER_DEBUG("defined parameters");
                 
                 absolute_delta_z = fabs( adjusted_redshift - redshift );
             }
-        }
-        
-//        printf("z = %e Required NF = %e Adjusted redshift = %e delta_z = %e\n",redshift,required_NF,adjusted_redshift,absolute_delta_z);
-        
+        }        
         stored_redshift = redshift;
         
         redshift = adjusted_redshift;
