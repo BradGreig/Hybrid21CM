@@ -754,12 +754,17 @@ def compute_luminosity_function(*, redshifts, user_params=None, cosmo_params=Non
     return Muvfunc, Mhfunc, lfunc
 
 
-def Initialise_PhotonConservationCorrection(*, user_params=None, cosmo_params=None, astro_params=None, flag_options=None,
-                                            redshifts_estimate, nf_estimate, NSpline):
+def Initialise_PhotonConservationCorrection(*, user_params=None, cosmo_params=None, astro_params=None, flag_options=None):
     user_params = UserParams(user_params)
     cosmo_params = CosmoParams(cosmo_params)
     astro_params = AstroParams(astro_params)
     flag_options = FlagOptions(flag_options)
+
+    return lib.InitialisePhotonCons(
+        user_params(), cosmo_params(), astro_params(), flag_options()
+    )
+
+def Calibrate_PhotonConservationCorrection(*,redshifts_estimate, nf_estimate, NSpline):
 
     # Convert the data to the right type
     redshifts_estimate = np.array(redshifts_estimate, dtype='float64')
@@ -768,9 +773,14 @@ def Initialise_PhotonConservationCorrection(*, user_params=None, cosmo_params=No
     z = ffi.cast("double *", ffi.from_buffer(redshifts_estimate))
     xHI = ffi.cast("double *", ffi.from_buffer(nf_estimate))
 
-    return lib.InitialisePhotonCons(
-        user_params(), cosmo_params(), astro_params(), flag_options(), z, xHI, NSpline
+    return lib.PhotonCons_Calibration(
+        z, xHI, NSpline
     )
+
+def Calculate_zstart_PhotonCons():
+    
+    # Run the C code
+    return lib.ComputeZstart_PhotonCons()
 
 
 def initial_conditions(*, user_params=None, cosmo_params=None, random_seed=None, regenerate=False, write=True,

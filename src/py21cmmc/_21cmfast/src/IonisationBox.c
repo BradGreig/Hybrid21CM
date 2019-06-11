@@ -5,7 +5,7 @@ int INIT_RECOMBINATIONS = 1;
 
 double *ERFC_VALS, *ERFC_VALS_DIFF;
 
-float prev_adjusted_redshift, absolute_delta_z;
+float prev_adjusted_redshift, absolute_delta_z, prev_absolute_delta_z, prev_gradient_cal;
 
 int ComputeIonizedBox(float redshift, float prev_redshift, struct UserParams *user_params, struct CosmoParams *cosmo_params,
                        struct AstroParams *astro_params, struct FlagOptions *flag_options,
@@ -65,7 +65,8 @@ LOG_DEBUG("redshift=%f, prev_redshift=%f", redshift, prev_redshift);
     float min_density, max_density;
     
     
-    float adjustment_factor, adjustment_factor_original, adjusted_redshift, required_NF, stored_redshift, closest_redshift;
+    float adjustment_factor, adjustment_factor_original, adjusted_redshift, required_NF, stored_redshift, closest_redshift, proposed_absolute_delta_z;
+    float future_z,future_NF,future_gradient_cal,future_adjusted_redshift;
     double temp;
     
     double mean_f_coll_st_photoncons, f_coll_photoncons, ST_over_PS_photoncons;
@@ -110,6 +111,9 @@ LOG_SUPER_DEBUG("defined parameters");
     t_ast = astro_params->t_STAR * t_hubble(redshift);
     growth_factor_dz = dicke(redshift-dz);
     
+    float gradient_cal, gradient_analytic, past_z, this_z_step, previous_z_step;
+    double gradient_val1, gradient_val2;
+    
     if(flag_options->PHOTON_CONS) {
         
         Q_at_z(redshift, &(temp));
@@ -117,14 +121,30 @@ LOG_SUPER_DEBUG("defined parameters");
         
         if(required_NF > global_params.PhotonConsStart) {
             adjusted_redshift = redshift;
+            
+            prev_absolute_delta_z = -1.;
+            absolute_delta_z = 0.;
         }
         else if(required_NF<=global_params.PhotonConsEnd) {
+//        else if(absolute_delta_z < 0.3 && required_NF < 0.9) {
             
             if(FirstNF_Estimate <= 0. && required_NF <= 0.0) {
                 // Reionisation has already happened well before the calibration
                 adjusted_redshift = redshift;
             }
             else {
+                
+//                past_z = (redshift + 1.)*global_params.ZPRIME_STEP_FACTOR - 1.;
+//                
+//                this_z_step = past_z - redshift;
+//                previous_z_step = ( (past_z + 1.)*global_params.ZPRIME_STEP_FACTOR - 1. ) - past_z;
+//                printf("past_z = %e this_z_step = %e previous_z_step = %e absolute_delta_z = %e absolute_delta_z' = %e\n",past_z,this_z_step,previous_z_step,absolute_delta_z,absolute_delta_z + ( previous_z_step - this_z_step ));
+//                adjusted_redshift = redshift - ( absolute_delta_z + ( previous_z_step - this_z_step ) );
+//                absolute_delta_z = absolute_delta_z + ( previous_z_step - this_z_step );
+
+                
+                // Maybe start gradually decreasing the absolute_delta_z to make this kink go away
+//                absolute_delta_z = 0.9*absolute_delta_z;
                 adjusted_redshift = redshift - absolute_delta_z;
             }
         }
@@ -138,14 +158,177 @@ LOG_SUPER_DEBUG("defined parameters");
                 z_at_NFHist(required_NF,&(temp));
                 adjusted_redshift = (float)temp;
                 
-                absolute_delta_z = fabs( adjusted_redshift - redshift );
+                future_z = (redshift + 1.)/global_params.ZPRIME_STEP_FACTOR - 1.;
+                Q_at_z(future_z, &(temp));
+                required_NF = 1.0 - (float)temp;
+                
+                if(required_NF<=global_params.PhotonConsEnd) {
+                    // The next step is going to have a small kink, lets try and smooth it out a little by modifying this adjusted redshift
+//                    past_z = (redshift + 1.)*global_params.ZPRIME_STEP_FACTOR - 1.;
+//                    
+//                    this_z_step = past_z - redshift;
+//                    previous_z_step = ( (past_z + 1.)*global_params.ZPRIME_STEP_FACTOR - 1. ) - past_z;
+                    
+//                    adjusted_redshift = adjusted_redshift - absolute_delta_z;
+                    absolute_delta_z = 0.95*absolute_delta_z;
+                    adjusted_redshift = redshift - absolute_delta_z;
+                }
+                else {
+                    absolute_delta_z = fabs( adjusted_redshift - redshift );
+                }
+                
             }
-        }        
+        }
+/*        else {
+            if(FirstNF_Estimate <= 0. && required_NF <= 0.0) {
+                // Reionisation has already happened well before the calibration
+                adjusted_redshift = redshift;
+            }
+            else if(required_NF < FinalNF_Estimate) {
+                // This model is completely unreasonble (reionisation will never happen!)
+                // So I don't really think it matters what I select for this
+                adjusted_redshift = redshift;
+            }
+            else {
+                z_at_NFHist(required_NF,&(temp));
+                adjusted_redshift = (float)temp;
+                
+                absolute_delta_z = fabs( adjusted_redshift - redshift );
+
+
+                printf("z = %e Required NF = %e Adjusted redshift = %e\n",redshift,required_NF,adjusted_redshift);
+                
+                if(required_NF < 0.95) {
+//                    z_at_Q(1.-(required_NF + 0.005),&(gradient_val1));
+//                    z_at_Q(1.-(required_NF),&(gradient_val2));
+//                
+//                    gradient_analytic = ( (float)gradient_val1 - (float)gradient_val2 )/0.005;
+//                
+//                    printf("analytic: val1 = %e val2 = %e\n",gradient_val1,gradient_val2);
+//
+//                    NFHist_at_z(redshift+0.001,&(gradient_val1));
+//                    NFHist_at_z(redshift,&(gradient_val2));
+//                    
+//                    gradient_cal = fabs( ( (float)gradient_val1 - (float)gradient_val2 )/0.001 );
+//                    printf("calibration (z): val1 = %e val2 = %e gradient = %e\n",gradient_val1,gradient_val2,gradient_cal);
+                    
+                    z_at_NFHist(required_NF+0.005,&(gradient_val1));
+                    z_at_NFHist(required_NF,&(gradient_val2));
+                
+                    gradient_cal = fabs( ( (float)gradient_val1 - (float)gradient_val2 )/0.005 );
+                    printf("calibration: val1 = %e val2 = %e gradient = %e next z test = %e\n",gradient_val1,gradient_val2,gradient_cal,(redshift + 1.)/global_params.ZPRIME_STEP_FACTOR - 1.);
+                    
+                    printf("gradient_cal = %e prev_gradient_cal = %e\n",gradient_cal,prev_gradient_cal);
+                    
+                    if(gradient_cal > prev_gradient_cal && fabs(prev_gradient_cal)>0.) {
+                        // Increase in the gradient of the calibration curve
+                        // Could be numerical or could be due to reionisation finishing, need to check
+                        
+                        future_z = (redshift + 1.)/global_params.ZPRIME_STEP_FACTOR - 1.;
+                        
+                        Q_at_z(future_z, &(temp));
+                        future_NF = 1.0 - (float)temp;
+                        
+                        z_at_NFHist(future_NF+0.005,&(gradient_val1));
+                        z_at_NFHist(future_NF,&(gradient_val2));
+                        
+                        future_gradient_cal = fabs( ( (float)gradient_val1 - (float)gradient_val2 )/0.005 );
+                        
+                        printf("future_z = %e future_NF = %e future_gradient_cal = %e\n",future_z,future_NF,future_gradient_cal);
+
+                        if(future_gradient_cal > gradient_cal) {
+                            // Ok, two successive increases in the calibration reionisation history, we are (likely) nearing the end of reionisation so I'll stop the calibration here
+                            adjusted_redshift = redshift - absolute_delta_z;
+                        }
+                        else {
+                            // Likely a numerical issue as only one gradient change. Smooth over the change to minimise kinks in the reionisation history
+  
+//                            past_z = (redshift + 1.)*global_params.ZPRIME_STEP_FACTOR - 1.;
+//                            
+//                            Q_at_z(past_z, &(temp));
+//                            
+//                            past_NF = 1.0 - (float)temp;
+//
+//                            z_at_NFHist(past_NF,&(temp));
+                            
+//                            prev_required_NF
+                            
+                            z_at_NFHist(future_NF,&(temp));
+                            
+                            future_adjusted_redshift = (float)temp;
+                            
+                            adjusted_redshift = (prev_adjusted_redshift + future_adjusted_redshift)/2.;
+                            
+                            absolute_delta_z = fabs( adjusted_redshift - redshift );
+                            
+                            printf("future_adjusted_redshift = %e adjusted_redshift = %e absolute_delta_z = %e\n",future_adjusted_redshift,adjusted_redshift,absolute_delta_z);
+                            
+//                            z_at_NFHist(future_NF,&());
+//                            
+//                            z_at_NFHist(required_NF,&(gradient_val2));
+                            
+//                            gradient_cal = (future_gradient_cal + prev_gradient_cal)/2.
+                            
+                        }
+                    }
+                    else {
+                        absolute_delta_z = fabs( adjusted_redshift - redshift );
+                    }
+//
+                    
+                    prev_gradient_cal = gradient_cal;
+//                    printf("z = %e gradient analytic = %e gradient calibration = %e\n",redshift,gradient_analytic,gradient_cal);
+                }
+                else {
+                    absolute_delta_z = fabs( adjusted_redshift - redshift );
+                }
+
+                
+                
+                
+//                if( required_NF < 0.95 && gradient_cal > prev_gradient_cal ) {
+//                    adjusted_redshift = redshift - absolute_delta_z;
+//                }
+//                else {
+//                    
+//                }
+
+//                proposed_absolute_delta_z = fabs( adjusted_redshift - redshift );
+//                printf("z = %e delta_z = %e prev_delta_z = %e difference = %e ratio = %e\n",redshift,proposed_absolute_delta_z,prev_absolute_delta_z,fabs( prev_absolute_delta_z - proposed_absolute_delta_z ),absolute_delta_z/prev_absolute_delta_z);
+//
+//                if(fabs( prev_absolute_delta_z - proposed_absolute_delta_z ) > 0.03 && prev_absolute_delta_z > proposed_absolute_delta_z && required_NF < 0.9) {
+//                    adjusted_redshift = redshift - prev_absolute_delta_z;
+//                    absolute_delta_z = prev_absolute_delta_z;
+//                }
+//                else {
+//                    absolute_delta_z = proposed_absolute_delta_z;
+//                }
+//                prev_absolute_delta_z = absolute_delta_z;
+                
+                
+                
+                
+            }
+        }
+*/
+//        printf("z = %e Required NF = %e Adjusted redshift = %e delta_z = %e\n",redshift,required_NF,adjusted_redshift,absolute_delta_z);
+        
         stored_redshift = redshift;
         
         redshift = adjusted_redshift;
         
+        if(ZSTEP==0.0) {
+            ZSTEP = 0.2;
+        }
+        else {
+            ZSTEP = prev_adjusted_redshift - redshift;
+        }
+        
         prev_adjusted_redshift = adjusted_redshift;
+        
+        fabs_dtdz = fabs(dtdz(redshift));
+        t_ast = astro_params->t_STAR * t_hubble(redshift);
+        growth_factor_dz = dicke(redshift-dz);
     }
     
     
@@ -852,6 +1035,7 @@ LOG_ULTRA_DEBUG("while loop for until RtoM(R)=%f reaches M_MIN=%f", RtoM(R), M_M
                     
                         curr_dens = 1.0 + perturbed_field->density[HII_R_INDEX(x,y,z)];
                         z_eff = (1+redshift) * pow(curr_dens, 1.0/3.0) - 1;
+//                        z_eff = (1+stored_redshift) * pow(curr_dens, 1.0/3.0) - 1;
                         dNrec = splined_recombination_rate(z_eff, box->Gamma12_box[HII_R_INDEX(x,y,z)]) * fabs_dtdz * ZSTEP * (1 - box->xH_box[HII_R_INDEX(x,y,z)]);
                         
                         if(isfinite(dNrec)==0) {
@@ -873,7 +1057,7 @@ LOG_ULTRA_DEBUG("while loop for until RtoM(R)=%f reaches M_MIN=%f", RtoM(R), M_M
     
     // deallocate
     gsl_rng_free (r);
-
+    
 LOG_DEBUG("global_xH = %e",global_xH);
 
     fftwf_free(deltax_unfiltered);

@@ -97,8 +97,11 @@ void z_at_Q(double Q, double *splined_value);
 
 static gsl_interp_accel *NFHistory_spline_acc;
 static gsl_spline *NFHistory_spline;
+static gsl_interp_accel *z_NFHistory_spline_acc;
+static gsl_spline *z_NFHistory_spline;
 void initialise_NFHistory_spline(double *redshifts, double *NF_estimate, int NSpline);
 void z_at_NFHist(double xHI_Hist, double *splined_value);
+void NFHist_at_z(double z, double *splined_value);
 
 //int nbin;
 //double *z_Q, *Q_value, *Q_z, *z_value;
@@ -1617,7 +1620,12 @@ int initialise_Nion_General_spline(float z, float min_density, float max_density
         overdense_val = log10(1. + overdense_small_low) + (double)i/((double)NSFR_low-1.)*(log10(1.+overdense_small_high)-log10(1.+overdense_small_low));
         
         log10_overdense_spline_SFR[i] = overdense_val;
-        log10_Nion_spline[i] = log10(GaussLegendreQuad_Nion(0,NGL_SFR,growthf,Mmax,sigma2,Deltac,pow(10.,overdense_val)-1.,MassTurnover,Alpha_star,Alpha_esc,Fstar10,Fesc10,Mlim_Fstar,Mlim_Fesc));
+        
+        log10_Nion_spline[i] = GaussLegendreQuad_Nion(0,NGL_SFR,growthf,Mmax,sigma2,Deltac,pow(10.,overdense_val)-1.,MassTurnover,Alpha_star,Alpha_esc,Fstar10,Fesc10,Mlim_Fstar,Mlim_Fesc);
+        if(fabs(log10_Nion_spline[i]) < 1e-38) {
+            log10_Nion_spline[i] = 1e-38;
+        }
+        log10_Nion_spline[i] = log10(log10_Nion_spline[i]);
 
         if(isfinite(log10_Nion_spline[i])==0) {
             LOG_ERROR("Detected either an infinite or NaN value in log10_Nion_spline");
@@ -1770,7 +1778,11 @@ int initialise_SFRD_Conditional_table(int Nfilter, float min_density[], float ma
         
         for (i=0; i<NSFR_low; i++){
             
-            log10_SFRD_z_low_table[j][i] = log10(GaussLegendreQuad_Nion(1,NGL_SFR,growthf[j],Mmax,sigma2,Deltac,overdense_low_table[i]-1.,MassTurnover,Alpha_star,0.,Fstar10,1.,Mlim_Fstar,0.));
+            log10_SFRD_z_low_table[j][i] = GaussLegendreQuad_Nion(1,NGL_SFR,growthf[j],Mmax,sigma2,Deltac,overdense_low_table[i]-1.,MassTurnover,Alpha_star,0.,Fstar10,1.,Mlim_Fstar,0.);
+            if(fabs(log10_SFRD_z_low_table[j][i]) < 1e-38) {
+                log10_SFRD_z_low_table[j][i] = 1e-38;
+            }
+            log10_SFRD_z_low_table[j][i] = log10(log10_SFRD_z_low_table[j][i]);
             
             if(isfinite(log10_SFRD_z_low_table[j][i])==0) {
 //                j = Nfilter;
@@ -1822,16 +1834,15 @@ int initialise_SFRD_Conditional_table(int Nfilter, float min_density[], float ma
 
 //   Set up interpolation table for the volume filling factor, Q, at a given redshift z and redshift at a given Q.
 int InitialisePhotonCons(struct UserParams *user_params, struct CosmoParams *cosmo_params,
-                         struct AstroParams *astro_params, struct FlagOptions *flag_options,
-                         double *z_estimate, double *xH_estimate, int NSpline)
+                         struct AstroParams *astro_params, struct FlagOptions *flag_options)
 {
     
     Broadcast_struct_global_PS(user_params,cosmo_params);
     Broadcast_struct_global_UF(user_params,cosmo_params);
     
-    if(xH_estimate[NSpline-1] > 0.0 && xH_estimate[NSpline-2] > 0.0 && xH_estimate[NSpline-3] > 0.0 && xH_estimate[0] <= global_params.PhotonConsStart) {
-        initialise_NFHistory_spline(z_estimate,xH_estimate,NSpline);
-    }
+//    if(xH_estimate[NSpline-1] > 0.0 && xH_estimate[NSpline-2] > 0.0 && xH_estimate[NSpline-3] > 0.0 && xH_estimate[0] <= global_params.PhotonConsStart) {
+//        initialise_NFHistory_spline(z_estimate,xH_estimate,NSpline);
+//    }
     
     
     //     To solve differentail equation, uses Euler's method.
@@ -1944,10 +1955,13 @@ int InitialisePhotonCons(struct UserParams *user_params, struct CosmoParams *cos
     double *Q_value = calloc(nbin,sizeof(double));
     
     Q_at_z_spline_acc = gsl_interp_accel_alloc ();
-    Q_at_z_spline = gsl_spline_alloc (gsl_interp_linear, nbin);
+//    Q_at_z_spline = gsl_spline_alloc (gsl_interp_linear, nbin);
+    Q_at_z_spline = gsl_spline_alloc (gsl_interp_cspline, nbin);
+    
     for (i=0; i<nbin; i++){
         z_Q[i] = z_arr[cnt-i];
         Q_value[i] = Q_arr[cnt-i];
+//        printf("%e %e\n",z_Q[i],1.-Q_value);
     }
     
     gsl_spline_init(Q_at_z_spline, z_Q, Q_value, nbin);
@@ -1961,7 +1975,8 @@ int InitialisePhotonCons(struct UserParams *user_params, struct CosmoParams *cos
     double *z_value = calloc(nbin,sizeof(double));
     
     z_at_Q_spline_acc = gsl_interp_accel_alloc ();
-    z_at_Q_spline = gsl_spline_alloc (gsl_interp_linear, nbin);
+//    z_at_Q_spline = gsl_spline_alloc (gsl_interp_linear, nbin);
+    z_at_Q_spline = gsl_spline_alloc (gsl_interp_cspline, nbin);
     for (i=0; i<nbin; i++){
         Q_z[i] = Q_value[nbin-1-i];
         z_value[i] = z_Q[nbin-1-i];
@@ -1973,6 +1988,28 @@ int InitialisePhotonCons(struct UserParams *user_params, struct CosmoParams *cos
     free(Q_arr);
     return(0);
 }
+
+
+
+int PhotonCons_Calibration(double *z_estimate, double *xH_estimate, int NSpline)
+{
+    
+    if(xH_estimate[NSpline-1] > 0.0 && xH_estimate[NSpline-2] > 0.0 && xH_estimate[NSpline-3] > 0.0 && xH_estimate[0] <= global_params.PhotonConsStart) {
+        initialise_NFHistory_spline(z_estimate,xH_estimate,NSpline);
+    }
+    
+    return(0);
+}
+
+double ComputeZstart_PhotonCons() {
+    
+    double temp;
+    
+    z_at_Q(1. - global_params.PhotonConsStart,&(temp));
+    
+    return(temp);
+}
+
 
 void Q_at_z(double z, double *splined_value){
     float returned_value;
@@ -2039,10 +2076,15 @@ void initialise_NFHistory_spline(double *redshifts, double *NF_estimate, int NSp
     }
     
     NFHistory_spline_acc = gsl_interp_accel_alloc ();
-    NFHistory_spline = gsl_spline_alloc (gsl_interp_linear, counter);
+    NFHistory_spline = gsl_spline_alloc (gsl_interp_cspline, counter);
 
     gsl_spline_init(NFHistory_spline, nf_vals, z_vals, counter);
 
+    z_NFHistory_spline_acc = gsl_interp_accel_alloc ();
+    z_NFHistory_spline = gsl_spline_alloc (gsl_interp_cspline, counter);
+    
+    gsl_spline_init(z_NFHistory_spline, z_vals, nf_vals, counter);
+    
 }
 
 
@@ -2050,5 +2092,12 @@ void z_at_NFHist(double xHI_Hist, double *splined_value){
     float returned_value;
     
     returned_value = gsl_spline_eval(NFHistory_spline, xHI_Hist, NFHistory_spline_acc);
+    *splined_value = returned_value;
+}
+
+void NFHist_at_z(double z, double *splined_value){
+    float returned_value;
+    
+    returned_value = gsl_spline_eval(z_NFHistory_spline, z, NFHistory_spline_acc);
     *splined_value = returned_value;
 }

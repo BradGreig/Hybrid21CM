@@ -115,13 +115,16 @@ int ComputeBrightnessTemp(float redshift, int saturated_limit, struct UserParams
                            struct PerturbedField *perturb_field, struct BrightnessTemp *box);
 
 int InitialisePhotonCons(struct UserParams *user_params, struct CosmoParams *cosmo_params,
-                         struct AstroParams *astro_params, struct FlagOptions *flag_options,
-                         double *z_estimate, double *xH_estimate, int NSpline);
+                         struct AstroParams *astro_params, struct FlagOptions *flag_options);
+
+int PhotonCons_Calibration(double *z_estimate, double *xH_estimate, int NSpline);
+double ComputeZstart_PhotonCons();
 
 int ComputeLF(int nbins, struct UserParams *user_params, struct CosmoParams *cosmo_params, struct AstroParams *astro_params,
                struct FlagOptions *flag_options, int NUM_OF_REDSHIFT_FOR_LF, float *z_LF, double *M_uv_z, double *M_h_z, double *log10phi);
 
 float ComputeTau(struct UserParams *user_params, struct CosmoParams *cosmo_params, int Npoints, float *redshifts, float *global_xHI);
+
 
 void Broadcast_struct_global_PS(struct UserParams *user_params, struct CosmoParams *cosmo_params);
 void Broadcast_struct_global_UF(struct UserParams *user_params, struct CosmoParams *cosmo_params);
