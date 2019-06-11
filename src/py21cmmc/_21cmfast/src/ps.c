@@ -1840,11 +1840,6 @@ int InitialisePhotonCons(struct UserParams *user_params, struct CosmoParams *cos
     Broadcast_struct_global_PS(user_params,cosmo_params);
     Broadcast_struct_global_UF(user_params,cosmo_params);
     
-//    if(xH_estimate[NSpline-1] > 0.0 && xH_estimate[NSpline-2] > 0.0 && xH_estimate[NSpline-3] > 0.0 && xH_estimate[0] <= global_params.PhotonConsStart) {
-//        initialise_NFHistory_spline(z_estimate,xH_estimate,NSpline);
-//    }
-    
-    
     //     To solve differentail equation, uses Euler's method.
     //     NOTE:
     //     (1) With the fiducial parameter set,
@@ -1955,13 +1950,11 @@ int InitialisePhotonCons(struct UserParams *user_params, struct CosmoParams *cos
     double *Q_value = calloc(nbin,sizeof(double));
     
     Q_at_z_spline_acc = gsl_interp_accel_alloc ();
-//    Q_at_z_spline = gsl_spline_alloc (gsl_interp_linear, nbin);
     Q_at_z_spline = gsl_spline_alloc (gsl_interp_cspline, nbin);
     
     for (i=0; i<nbin; i++){
         z_Q[i] = z_arr[cnt-i];
         Q_value[i] = Q_arr[cnt-i];
-//        printf("%e %e\n",z_Q[i],1.-Q_value);
     }
     
     gsl_spline_init(Q_at_z_spline, z_Q, Q_value, nbin);
@@ -1975,7 +1968,6 @@ int InitialisePhotonCons(struct UserParams *user_params, struct CosmoParams *cos
     double *z_value = calloc(nbin,sizeof(double));
     
     z_at_Q_spline_acc = gsl_interp_accel_alloc ();
-//    z_at_Q_spline = gsl_spline_alloc (gsl_interp_linear, nbin);
     z_at_Q_spline = gsl_spline_alloc (gsl_interp_cspline, nbin);
     for (i=0; i<nbin; i++){
         Q_z[i] = Q_value[nbin-1-i];
@@ -1989,8 +1981,7 @@ int InitialisePhotonCons(struct UserParams *user_params, struct CosmoParams *cos
     return(0);
 }
 
-
-
+// Function to construct the spline for the calibration curve of the photon non-conservation
 int PhotonCons_Calibration(double *z_estimate, double *xH_estimate, int NSpline)
 {
     
@@ -2001,6 +1992,7 @@ int PhotonCons_Calibration(double *z_estimate, double *xH_estimate, int NSpline)
     return(0);
 }
 
+// Function callable from Python to know at which redshift to start sampling the calibration curve (to minimise function calls)
 double ComputeZstart_PhotonCons() {
     
     double temp;
