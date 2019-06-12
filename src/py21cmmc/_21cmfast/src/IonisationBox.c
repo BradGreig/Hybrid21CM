@@ -5,7 +5,7 @@ int INIT_RECOMBINATIONS = 1;
 
 double *ERFC_VALS, *ERFC_VALS_DIFF;
 
-float prev_adjusted_redshift, absolute_delta_z, prev_absolute_delta_z, prev_gradient_cal;
+float absolute_delta_z;
 
 int ComputeIonizedBox(float redshift, float prev_redshift, struct UserParams *user_params, struct CosmoParams *cosmo_params,
                        struct AstroParams *astro_params, struct FlagOptions *flag_options,
@@ -64,16 +64,8 @@ LOG_DEBUG("redshift=%f, prev_redshift=%f", redshift, prev_redshift);
     
     float min_density, max_density;
     
-    
-    float adjustment_factor, adjustment_factor_original, adjusted_redshift, required_NF, stored_redshift, closest_redshift, proposed_absolute_delta_z;
-    float future_z,future_NF,future_gradient_cal,future_adjusted_redshift;
+    float adjusted_redshift, required_NF, stored_redshift, adjustment_factor, future_z;
     double temp;
-    
-    double mean_f_coll_st_photoncons, f_coll_photoncons, ST_over_PS_photoncons;
-    float redshift_table_fcollz_photoncons, min_density_photoncons, max_density_photoncons;
-    int redshift_int_fcollz_photoncons;
-    float curr_dens_photoncons;
-    
     
     const gsl_rng_type * T;
     gsl_rng * r;
@@ -111,9 +103,6 @@ LOG_SUPER_DEBUG("defined parameters");
     t_ast = astro_params->t_STAR * t_hubble(redshift);
     growth_factor_dz = dicke(redshift-dz);
     
-    float gradient_cal, gradient_analytic, past_z, this_z_step, previous_z_step;
-    double gradient_val1, gradient_val2;
-    
     // Modify the current sampled redshift to a redshift which matches the expected filling factor given our astrophysical parameterisation.
     // This is the photon non-conservation correction
     if(flag_options->PHOTON_CONS) {
@@ -127,7 +116,6 @@ LOG_SUPER_DEBUG("defined parameters");
             // We haven't started ionising yet, so keep redshifts the same
             adjusted_redshift = redshift;
             
-            prev_absolute_delta_z = -1.;
             absolute_delta_z = 0.;
         }
         else if(required_NF<=global_params.PhotonConsEnd) {
@@ -182,20 +170,6 @@ LOG_SUPER_DEBUG("defined parameters");
         
         // This redshift snapshot now uses the modified redshift following the photon non-conservation correction
         redshift = adjusted_redshift;
-        
-        // Adjust requisite parameters following the modification of redshift for the photon non-conservation correction
-        if(ZSTEP==0.0) {
-            ZSTEP = 0.2;
-        }
-        else {
-            ZSTEP = prev_adjusted_redshift - redshift;
-        }
-        
-        prev_adjusted_redshift = adjusted_redshift;
-        
-        fabs_dtdz = fabs(dtdz(redshift));
-        t_ast = astro_params->t_STAR * t_hubble(redshift);
-        growth_factor_dz = dicke(redshift-dz);
     }
     
     
@@ -272,10 +246,12 @@ LOG_SUPER_DEBUG("erfc interpolation done");
     
     if(flag_options->PHOTON_CONS) {
     
+        adjustment_factor = dicke(redshift)/dicke(stored_redshift);
+        
         for (i=0; i<user_params->HII_DIM; i++){
             for (j=0; j<user_params->HII_DIM; j++){
                 for (k=0; k<user_params->HII_DIM; k++){
-                    *((float *)deltax_unfiltered + HII_R_FFT_INDEX(i,j,k)) = (perturbed_field->density[HII_R_INDEX(i,j,k)])*dicke(redshift)/dicke(stored_redshift);
+                    *((float *)deltax_unfiltered + HII_R_FFT_INDEX(i,j,k)) = (perturbed_field->density[HII_R_INDEX(i,j,k)])*adjustment_factor;
                 }
             }
         }
@@ -780,8 +756,14 @@ LOG_ULTRA_DEBUG("while loop for until RtoM(R)=%f reaches M_MIN=%f", RtoM(R), M_M
             rec = 0.;
         
             xHI_from_xrays = 1;
-            Gamma_R_prefactor = pow(1+redshift, 2) * (R*CMperMPC) * SIGMA_HI * global_params.ALPHA_UVB / (global_params.ALPHA_UVB+2.75) * N_b0 * ION_EFF_FACTOR / 1.0e-12;
             
+            if(flag_options->PHOTON_CONS) {
+                // Used for recombinations, which means we want to use the original redshift not the adjusted redshift
+                Gamma_R_prefactor = pow(1+stored_redshift, 2) * (R*CMperMPC) * SIGMA_HI * global_params.ALPHA_UVB / (global_params.ALPHA_UVB+2.75) * N_b0 * ION_EFF_FACTOR / 1.0e-12;
+            }
+            else {
+                Gamma_R_prefactor = pow(1+redshift, 2) * (R*CMperMPC) * SIGMA_HI * global_params.ALPHA_UVB / (global_params.ALPHA_UVB+2.75) * N_b0 * ION_EFF_FACTOR / 1.0e-12;
+            }
             Gamma_R_prefactor /= t_ast;
             
             for (x=0; x<user_params->HII_DIM; x++){
@@ -900,8 +882,16 @@ LOG_ULTRA_DEBUG("while loop for until RtoM(R)=%f reaches M_MIN=%f", RtoM(R), M_M
                 for (y=0; y<user_params->HII_DIM; y++){
                     for (z=0; z<user_params->HII_DIM; z++){
                     
-                        curr_dens = 1.0 + perturbed_field->density[HII_R_INDEX(x,y,z)];
-                        z_eff = (1+redshift) * pow(curr_dens, 1.0/3.0) - 1;
+                        if(flag_options->PHOTON_CONS) {
+                            // use the original density and redshift for the snapshot (not the adjusted redshift)
+                            // Only want to use the adjusted redshift for the ionisation field
+                            curr_dens = 1.0 + (perturbed_field->density[HII_R_INDEX(x,y,z)])/adjustment_factor;
+                            z_eff = (1+stored_redshift) * pow(curr_dens, 1.0/3.0) - 1;
+                        }
+                        else {
+                            curr_dens = 1.0 + perturbed_field->density[HII_R_INDEX(x,y,z)];
+                            z_eff = (1+redshift) * pow(curr_dens, 1.0/3.0) - 1;
+                        }
                         dNrec = splined_recombination_rate(z_eff, box->Gamma12_box[HII_R_INDEX(x,y,z)]) * fabs_dtdz * ZSTEP * (1 - box->xH_box[HII_R_INDEX(x,y,z)]);
                         
                         if(isfinite(dNrec)==0) {
