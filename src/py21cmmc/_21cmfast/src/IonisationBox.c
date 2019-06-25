@@ -140,7 +140,6 @@ LOG_SUPER_DEBUG("defined parameters");
             }
             else {
                 // Find the corresponding redshift for the calibration curve given the required neutral fraction (filling factor) from the analytic expression
-                
                 z_at_NFHist(required_NF,&(temp));
                 adjusted_redshift = (float)temp;
                 
@@ -150,9 +149,10 @@ LOG_SUPER_DEBUG("defined parameters");
                 required_NF = 1.0 - (float)temp;
                 
                 // The next time crosses the threshold
-                if(required_NF<=global_params.PhotonConsEnd) {
+                if(required_NF<=(1.1*global_params.PhotonConsEnd)) {
                     // The next step is going to have a small kink, lets try and smooth it out a little by modifying this adjusted redshift
-
+                    // The 10 per cent is to avoid just being short of this cut-off. In those instances the kink returns
+                    
                     absolute_delta_z = 0.95*absolute_delta_z;
                     adjusted_redshift = redshift - absolute_delta_z;
                 }
@@ -171,7 +171,6 @@ LOG_SUPER_DEBUG("defined parameters");
         // This redshift snapshot now uses the modified redshift following the photon non-conservation correction
         redshift = adjusted_redshift;
     }
-    
     
     Splined_Fcoll = 0.;
     
@@ -322,6 +321,8 @@ LOG_SUPER_DEBUG("sigma table has been initialised");
     // Determine the normalisation for the excursion set algorithm
     if (flag_options->USE_MASS_DEPENDENT_ZETA) {
         mean_f_coll = Nion_General(redshift,astro_params->M_TURN,astro_params->ALPHA_STAR,astro_params->ALPHA_ESC,astro_params->F_STAR10,astro_params->F_ESC10,Mlim_Fstar,Mlim_Fesc);
+
+        f_coll_min = Nion_General(global_params.Z_HEAT_MAX,astro_params->M_TURN,astro_params->ALPHA_STAR,astro_params->ALPHA_ESC,astro_params->F_STAR10,astro_params->F_ESC10,Mlim_Fstar,Mlim_Fesc);
     }
     else {
         mean_f_coll = FgtrM_General(redshift, M_MIN);
@@ -334,7 +335,6 @@ LOG_SUPER_DEBUG("sigma table has been initialised");
     }
 
 LOG_SUPER_DEBUG("excursion set normalisation, mean_f_coll: %f", mean_f_coll);
-//    printf("mean_f_coll_st = %e ION_EFF_FACTOR = %e\n",mean_f_coll,ION_EFF_FACTOR);
     if (mean_f_coll * ION_EFF_FACTOR < global_params.HII_ROUND_ERR){ // way too small to ionize anything...
     //        printf( "The mean collapse fraction is %e, which is much smaller than the effective critical collapse fraction of %e\n I will just declare everything to be neutral\n", mean_f_coll, f_coll_crit);
         
@@ -626,7 +626,7 @@ LOG_ULTRA_DEBUG("while loop for until RtoM(R)=%f reaches M_MIN=%f", RtoM(R), M_M
                 overdense_small_bin_width_inv = 1./overdense_small_bin_width;
                 
                 initialiseGL_Nion(NGL_SFR, astro_params->M_TURN,massofscaleR);
-                
+
                 if(initialise_Nion_General_spline(redshift,min_density,max_density,massofscaleR,astro_params->M_TURN,astro_params->ALPHA_STAR,astro_params->ALPHA_ESC,astro_params->F_STAR10,astro_params->F_ESC10,Mlim_Fstar,Mlim_Fesc)!=0) {
                     LOG_ERROR("I have encountered an infinite or a NaN value in initialise_Nion_General_spline");
                     return(2);
@@ -910,7 +910,6 @@ LOG_ULTRA_DEBUG("while loop for until RtoM(R)=%f reaches M_MIN=%f", RtoM(R), M_M
             
         }
     }
-    
     // deallocate
     gsl_rng_free (r);
     

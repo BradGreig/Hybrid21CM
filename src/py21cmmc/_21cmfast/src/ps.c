@@ -1801,7 +1801,7 @@ int initialise_SFRD_Conditional_table(int Nfilter, float min_density[], float ma
             
             SFRD_z_high_table[j][i] = Nion_ConditionalM(growthf[j],Mmin,Mmax,sigma2,Deltac,Overdense_high_table[i],MassTurnover,Alpha_star,0.,Fstar10,1.,Mlim_Fstar,0.);
             
-            if(isfinite(log10_SFRD_z_low_table[j][i])==0) {
+            if(isfinite(SFRD_z_high_table[j][i])==0) {
 //                j = Nfilter;
 //                i = larger;
                 LOG_ERROR("Detected either an infinite or NaN value in SFRD_z_high_table");
@@ -2059,23 +2059,23 @@ void initialise_NFHistory_spline(double *redshifts, double *NF_estimate, int NSp
         }
     }
     
-    double *nf_vals = calloc(counter,sizeof(double));
-    double *z_vals = calloc(counter,sizeof(double));
+    double *nf_vals = calloc((counter+1),sizeof(double));
+    double *z_vals = calloc((counter+1),sizeof(double));
     
-    for(i=0;i<counter;i++) {
+    for(i=0;i<(counter+1);i++) {
         nf_vals[i] = NF_estimate[start_index+i];
         z_vals[i] = redshifts[start_index+i];
     }
     
     NFHistory_spline_acc = gsl_interp_accel_alloc ();
-    NFHistory_spline = gsl_spline_alloc (gsl_interp_cspline, counter);
+    NFHistory_spline = gsl_spline_alloc (gsl_interp_cspline, (counter+1));
 
-    gsl_spline_init(NFHistory_spline, nf_vals, z_vals, counter);
+    gsl_spline_init(NFHistory_spline, nf_vals, z_vals, (counter+1));
 
     z_NFHistory_spline_acc = gsl_interp_accel_alloc ();
-    z_NFHistory_spline = gsl_spline_alloc (gsl_interp_cspline, counter);
+    z_NFHistory_spline = gsl_spline_alloc (gsl_interp_cspline, (counter+1));
     
-    gsl_spline_init(z_NFHistory_spline, z_vals, nf_vals, counter);
+    gsl_spline_init(z_NFHistory_spline, z_vals, nf_vals, (counter+1));
     
 }
 
